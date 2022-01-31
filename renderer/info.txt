@@ -1,0 +1,27 @@
+#Basic idea to draw a line:
+from x0 y0 to x1 y1:
+	iterate from x0 to x1 and y0 to y1 with 0.01 as intervals and draw the pixel on every iteration.
+	for(float i=0.; i<1; i+=0.01){
+		int x = x0 + (x1-x0)*i;
+		int y = y0 + (y1-y0)*i;
+		image.set(x,y,color);
+	}
+	
+	
+#Optimising this shit:
+	check if width is smaller than height , which means the line will be steep. So just transpose the line:
+	swap x0 with y0 and x1 with y1
+	
+	check if x0 is > x1: if yes then swap the coordinates:
+	swap x0 with x1 and y0 with y1
+	
+	dx = x1 - x0
+	dy = y1 - y0
+	
+	float derror = abs(dy/float(dx))
+	error = 0 // gives the distance to the best straight line from x,y.
+	error +=derror;
+	if error>0.5:
+		y+=1 if y1>y0 else y-=1
+		error -= 1
+	
