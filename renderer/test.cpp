@@ -10,6 +10,7 @@
 const TGAColor white = TGAColor(255,255,255,255);
 const TGAColor red = TGAColor(255,0,0,255);
 const TGAColor green = TGAColor(0,255,0,255);
+const TGAColor blue = TGAColor(0,0,255,255);
 const int width = 800;
 const int height = 800;
 Model *model = NULL;
@@ -148,6 +149,22 @@ void draw_wire_frame(Model* model, TGAImage& image){
 	}
 }
 
+void rasterize1D(TGAImage& image, Vec2i p0, Vec2i p1, TGAColor color, int *ybuffer){
+	if(p0.x > p1.x) std::swap(p0, p1);
+	
+	//int c = (p1.x*p0.y - p1.x*p0.y);
+	//float m = (p1.y-p0.y)/(float)(p1.x - p0.x);
+	for(int x = p0.x; x<=p1.x; x++){
+		float t = (x-p0.x)/(float)(p1.x-p0.x);
+		int y = p0.y*(1.-t) + p1.y*t;
+		if(ybuffer[x] < y){
+			ybuffer[x] = y;
+			image.set(x, 0, color);
+		}
+	}
+}
+
+
 void flate_shade_render(Model *model, TGAImage& image, Vec3f light_dir){
 	for(int i=0; i<model->nfaces(); i++){
 		std::vector<int> face = model -> face(i);
@@ -171,17 +188,27 @@ void flate_shade_render(Model *model, TGAImage& image, Vec3f light_dir){
 }
 
 int main(int argc, char** argv){
-	
+	/*
 	if(2==argc){
 		model = new Model(argv[1]);
 	}
 	else {
 		model = new Model("head.obj");
+	}*/
+	
+	TGAImage image(width, 16, TGAImage::RGB);
+	Vec3f light_dir(0,0,-1);
+	//flate_shade_render(model, image, Vec3f(0,0,-1));
+	
+	int ybuffer[width];
+	for(int i=0; i<width; i++){
+		ybuffer[i] = std::numeric_limits<int>::min();
 	}
 	
-	TGAImage image(width, height, TGAImage::RGB);
-	Vec3f light_dir(0,0,-1);
-	flate_shade_render(model, image, Vec3f(0,0,-1));
+	rasterize1D(image, Vec2i(20, 34),   Vec2i(744, 400), red,   ybuffer);
+	rasterize1D(image, Vec2i(120, 434), Vec2i(444, 400), green,   ybuffer);
+	rasterize1D(image, Vec2i(330, 463),   Vec2i(594, 200), blue,   ybuffer);
+	
 	
 	//image.flip_vertically();
 	image.write_tga_file("out.tga");
