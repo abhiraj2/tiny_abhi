@@ -94,24 +94,31 @@ Vec3f cross(Vec3f v1, Vec3f v2) {
 
 // Multi Core method for drawing lines
 // cross product (ABx ACx PA) and (ABy ACy PA) barry center is 1-u-v u v
-Vec3f barrycentric(Vec2i *pts, Vec2i P){
-	Vec3f u = cross(Vec3f(pts[2].x -pts[0].x, pts[1].x - pts[0].x, pts[0].x - P.x), Vec3f(pts[2].y -pts[0].y, pts[1].y- pts[0].y, pts[0].y-P.y));
-	if (std::abs(u.z) < 1) return Vec3f(-1,1,1);
-	return Vec3f(1.f-(u.x+u.y)/u.z, u.y/u.z, u.x/u.z);
+Vec3f barrycentric(Vec3f A, Vec3f B, Vec3f C, Vec3f P) {
+    Vec3f s[2];
+    for (int i=2; i--; ) {
+        s[i][0] = C[i]-A[i];
+        s[i][1] = B[i]-A[i];
+        s[i][2] = A[i]-P[i];
+    }
+    Vec3f u = cross(s[0], s[1]);
+    if (std::abs(u[2])>1e-2) // dont forget that u[2] is integer. If it is zero then triangle ABC is degenerate
+        return Vec3f(1.f-(u.x+u.y)/u.z, u.y/u.z, u.x/u.z);
+    return Vec3f(-1,1,1); // in this case generate negative coordinates, it will be thrown away by the rasterizator
 }
 
 
-void triangle(TGAImage& image, Vec2i *pts, TGAColor color){
-	Vec2i bboxmin(image.width()-1, image.height()-1);
-	Vec2i bboxmax(0, 0);
-	Vec2i clamp(image.width()-1, image.height()-1);
+void triangle(TGAImage& image, Vec3f *pts, float* zbuffer, TGAColor color ){
+	Vec2f bboxmin(image.width()-1, image.height()-1);
+	Vec2f bboxmax(0, 0);
+	Vec2f clamp(image.width()-1, image.height()-1);
  	for(int i=0; i<3; i++){
 		for(int j=0; j<2; j++){
 			if(j==0){
-				bboxmin.x = std::max(0, std::min(bboxmin.x, pts[i].x));
+				bboxmin.x = std::max((float)0, std::min(bboxmin.x, pts[i].x));
 				bboxmax.x  = std::min(clamp.x, std::max(bboxmax.x, pts[i].x));
 			}else{
-				bboxmin.y = std::max(0, std::min(bboxmin.y, pts[i].y));
+				bboxmin.y = std::max((float)0, std::min(bboxmin.y, pts[i].y));
 				bboxmax.y  = std::min(clamp.y, std::max(bboxmax.y, pts[i].y));
 			}
 			
@@ -121,12 +128,17 @@ void triangle(TGAImage& image, Vec2i *pts, TGAColor color){
 	//std::cout << bboxmin.x << " " << bboxmin.y << std::endl;
 	//std::cout << bboxmax.x << " " << bboxmax.y << std::endl;
 	
-	Vec2i P;
+	Vec3f P;
 	for(P.x=bboxmin.x; P.x<=bboxmax.x; P.x++){
 		for(P.y=bboxmin.y; P.y<=bboxmax.y; P.y++){
-			Vec3f lol = barrycentric(pts, P);
+			Vec3f lol = barrycentric(pts[0],pts[1], pts[2], P);
 			if(lol.x < 0 || lol.y <0 || lol.z < 0) continue;
-			image.set(P.x, P.y, color);
+			P.z =0;
+			for(int i=0; i<3; i++) P.z += lol[i]*pts[i][2];
+			if(zbuffer[(int)(P.x + image.width()*P.y)] < P.z){
+				zbuffer[(int)(P.x + image.width()*P.y)] = P.z;
+				image.set(P.x, P.y, color);
+			}
 		}
 		
 	}
@@ -164,11 +176,11 @@ void rasterize1D(TGAImage& image, Vec2i p0, Vec2i p1, TGAColor color, int *ybuff
 	}
 }
 
-
-void flate_shade_render(Model *model, TGAImage& image, Vec3f light_dir){
+/*
+void flate_shade_render(Model *model, TGAImage& image, float *zbuffer, Vec3f light_dir){
 	for(int i=0; i<model->nfaces(); i++){
 		std::vector<int> face = model -> face(i);
-		Vec2i screen_coords[3];
+		Vec3f screen_coords[3];
 		Vec3f world_coords[3];
 		for(int j=0; j<3; j++){
 			Vec3f v = model->vert(face[j]);
@@ -177,41 +189,58 @@ void flate_shade_render(Model *model, TGAImage& image, Vec3f light_dir){
 		}
 		//triangle(image, screen_coords, TGAColor(rand()%255, rand()%255, rand()%255, 255));
 		
-		Vec3f n = (world_coords[2] - world_coords[0])^(world_coords[1]-world_coords[0]);
+		Vec3f n = cross((world_coords[2] - world_coords[0]),(world_coords[1]-world_coords[0]));
 		n.normalize();
 		float intensity = n * light_dir;
 		//std::cout << in << std::endl;
 		if(intensity > 0){
-			triangle(image, screen_coords, TGAColor(intensity*255, intensity*255, intensity*255, 255));
+			triangle(image, screen_coords, zbuffer, TGAColor(intensity*255, intensity*255, intensity*255, 255));
 		}
 	}
+}*/
+
+Vec3f world2screen(Vec3f v){
+	return Vec3f(int((v.x+1)*width/2. + .5),int((v.y+1.)*height/2. +.5), v.z);
 }
 
 int main(int argc, char** argv){
-	/*
+	
 	if(2==argc){
 		model = new Model(argv[1]);
 	}
 	else {
 		model = new Model("head.obj");
-	}*/
+	}
 	
-	TGAImage image(width, 16, TGAImage::RGB);
+	TGAImage image(width, height, TGAImage::RGB);
 	Vec3f light_dir(0,0,-1);
 	//flate_shade_render(model, image, Vec3f(0,0,-1));
 	
-	int ybuffer[width];
-	for(int i=0; i<width; i++){
-		ybuffer[i] = std::numeric_limits<int>::min();
+	float *zbuffer = new float[width*height];
+	
+	for (int i=width*height; i--; zbuffer[i] = -std::numeric_limits<float>::max());
+
+	
+	for(int i=0; i< model->nfaces(); i++){
+		std::vector<int> face = model->face(i);
+        Vec3f pts[3];
+		Vec3f world_coords[3];
+        for (int i=0; i<3; i++) pts[i] = world2screen(model->vert(face[i]));
+		for(int j=0; j<3; j++){
+			Vec3f v = model->vert(face[j]);
+			world_coords[j] = v; 
+		}
+		Vec3f n = cross((world_coords[2] - world_coords[0]),(world_coords[1]-world_coords[0]));
+		n.normalize();
+		float intensity = n * light_dir;
+		
+        triangle(image, pts, zbuffer, TGAColor(intensity*255, intensity*255, intensity*255, 255));
 	}
 	
-	rasterize1D(image, Vec2i(20, 34),   Vec2i(744, 400), red,   ybuffer);
-	rasterize1D(image, Vec2i(120, 434), Vec2i(444, 400), green,   ybuffer);
-	rasterize1D(image, Vec2i(330, 463),   Vec2i(594, 200), blue,   ybuffer);
 	
 	
 	//image.flip_vertically();
 	image.write_tga_file("out.tga");
-	//delete model;
+	delete model;
 	return 0;
 }
