@@ -3,6 +3,7 @@
 #include <vector>
 #include "model.h"
 #include "geometry.h"
+#include <iostream>
 
 
 
@@ -46,7 +47,7 @@ void draw_line(TGAImage& image, int x0, int y0, int x1, int y1, TGAColor color){
 	}
 }
 
-
+/*
 void triangle(TGAImage& image, Vec2i t0, Vec2i t1, Vec2i t2, TGAColor color){
 	if(t0.y > t1.y) std::swap(t0, t1);
 	if(t1.y > t2.y) std::swap(t1, t2);
@@ -82,6 +83,54 @@ void triangle(TGAImage& image, Vec2i t0, Vec2i t1, Vec2i t2, TGAColor color){
 	}
 	
 }
+*/
+
+
+	
+Vec3f cross(Vec3f v1, Vec3f v2) {
+    return Vec3f(v1.y*v2.z - v1.z*v2.y, v1.z*v2.x - v1.x*v2.z, v1.x*v2.y - v1.y*v2.x);
+}
+
+// Multi Core method for drawing lines
+// cross product (ABx ACx PA) and (ABy ACy PA) barry center is 1-u-v u v
+Vec3f barrycentric(Vec2i *pts, Vec2i P){
+	Vec3f u = cross(Vec3f(pts[2].x -pts[0].x, pts[1].x - pts[0].x, pts[0].x - P.x), Vec3f(pts[2].y -pts[0].y, pts[1].y- pts[0].y, pts[0].y-P.y));
+	if (std::abs(u.z) < 1) return Vec3f(-1,1,1);
+	return Vec3f(1.f-(u.x+u.y)/u.z, u.y/u.z, u.x/u.z);
+}
+
+
+void triangle(TGAImage& image, Vec2i *pts, TGAColor color){
+	Vec2i bboxmin(image.width()-1, image.height()-1);
+	Vec2i bboxmax(0, 0);
+	Vec2i clamp(image.width()-1, image.height()-1);
+ 	for(int i=0; i<3; i++){
+		for(int j=0; j<2; j++){
+			if(j==0){
+				bboxmin.x = std::max(0, std::min(bboxmin.x, pts[i].x));
+				bboxmax.x  = std::min(clamp.x, std::max(bboxmax.x, pts[i].x));
+			}else{
+				bboxmin.y = std::max(0, std::min(bboxmin.y, pts[i].y));
+				bboxmax.y  = std::min(clamp.y, std::max(bboxmax.y, pts[i].y));
+			}
+			
+		}
+	}
+	
+	std::cout << bboxmin.x << " " << bboxmin.y << std::endl;
+	std::cout << bboxmax.x << " " << bboxmax.y << std::endl;
+	
+	Vec2i P;
+	for(P.x=bboxmin.x; P.x<=bboxmax.x; P.x++){
+		for(P.y=bboxmin.y; P.y<=bboxmax.y; P.y++){
+			Vec3f lol = barrycentric(pts, P);
+			if(lol.x < 0 || lol.y <0 || lol.z < 0) continue;
+			image.set(P.x, P.y, color);
+		}
+		
+	}
+}
+
 
 
 void draw_wire_frame(Model* model, TGAImage& image){
@@ -113,9 +162,9 @@ int main(int argc, char** argv){
 	Vec2i t0[3] = {Vec2i(10, 70),   Vec2i(50, 160),  Vec2i(70, 80)}; 
 	Vec2i t1[3] = {Vec2i(180, 50),  Vec2i(150, 1),   Vec2i(70, 180)}; 
 	Vec2i t2[3] = {Vec2i(180, 150), Vec2i(120, 160), Vec2i(130, 180)}; 
-	triangle(image, t0[0], t0[1], t0[2], red);
-	triangle(image, t1[0], t1[1], t1[2], white);
-	triangle(image, t2[0], t2[1], t2[2], green);
+	triangle(image, t0, red);
+	triangle(image, t1, white);
+	triangle(image, t2, green);
 	
 	//image.flip_vertically();
 	image.write_tga_file("out.tga");
