@@ -117,8 +117,8 @@ void triangle(TGAImage& image, Vec2i *pts, TGAColor color){
 		}
 	}
 	
-	std::cout << bboxmin.x << " " << bboxmin.y << std::endl;
-	std::cout << bboxmax.x << " " << bboxmax.y << std::endl;
+	//std::cout << bboxmin.x << " " << bboxmin.y << std::endl;
+	//std::cout << bboxmax.x << " " << bboxmax.y << std::endl;
 	
 	Vec2i P;
 	for(P.x=bboxmin.x; P.x<=bboxmax.x; P.x++){
@@ -148,23 +148,40 @@ void draw_wire_frame(Model* model, TGAImage& image){
 	}
 }
 
+void flate_shade_render(Model *model, TGAImage& image, Vec3f light_dir){
+	for(int i=0; i<model->nfaces(); i++){
+		std::vector<int> face = model -> face(i);
+		Vec2i screen_coords[3];
+		Vec3f world_coords[3];
+		for(int j=0; j<3; j++){
+			Vec3f v = model->vert(face[j]);
+			screen_coords[j] = Vec2i((v.x+1)*image.width()/2., (v.y+1)*image.height()/2.);
+			world_coords[j] = v; 
+		}
+		//triangle(image, screen_coords, TGAColor(rand()%255, rand()%255, rand()%255, 255));
+		
+		Vec3f n = (world_coords[2] - world_coords[0])^(world_coords[1]-world_coords[0]);
+		n.normalize();
+		float intensity = n * light_dir;
+		//std::cout << in << std::endl;
+		if(intensity > 0){
+			triangle(image, screen_coords, TGAColor(intensity*255, intensity*255, intensity*255, 255));
+		}
+	}
+}
+
 int main(int argc, char** argv){
-	/*
+	
 	if(2==argc){
 		model = new Model(argv[1]);
 	}
 	else {
 		model = new Model("head.obj");
-	}*/
+	}
 	
 	TGAImage image(width, height, TGAImage::RGB);
-	
-	Vec2i t0[3] = {Vec2i(10, 70),   Vec2i(50, 160),  Vec2i(70, 80)}; 
-	Vec2i t1[3] = {Vec2i(180, 50),  Vec2i(150, 1),   Vec2i(70, 180)}; 
-	Vec2i t2[3] = {Vec2i(180, 150), Vec2i(120, 160), Vec2i(130, 180)}; 
-	triangle(image, t0, red);
-	triangle(image, t1, white);
-	triangle(image, t2, green);
+	Vec3f light_dir(0,0,-1);
+	flate_shade_render(model, image, Vec3f(0,0,-1));
 	
 	//image.flip_vertically();
 	image.write_tga_file("out.tga");
