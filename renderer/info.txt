@@ -24,4 +24,61 @@ from x0 y0 to x1 y1:
 	if error>0.5:
 		y+=1 if y1>y0 else y-=1
 		error -= 1
+		
+		
+		
+Drawing Triangles (filled):
+	Sort the coordinates in descending order wrt y coordinate.
+	define alpha and beta
+	alpha: (y-y0)/total_height // interpolate from y0 to y2
+	beta: (y-y1)/segment_height // interpolate from y0 to y1
+	y++ from y=y0 to y1
 	
+	
+	
+	New method:
+	Calculate the bounding box and check if the barry center of a point is negative
+	If not then fill that point
+	
+	bboxmin(width, height)
+	bboxmax(0,0)
+	clamp(width, height) // high value
+	Basically set the maximum and minimum values for the bbox.
+	for(i from 0 to 3):
+		for (j from 0 to 2):
+			bboxomin[j] = max(0,min(bboxmin[j], pts[i][j]));
+			bboxmax[j] = min(clamp[j], max(bboxmax[j], pts[i][j]));
+	
+	Go through each pixel in the bbox an calc the barry center 
+	
+	if any of the coordinates is less than 0 the point is outside the triangle.
+
+Hiding faces based on z buffer
+	I order to simply explain things, first we'll discuss 2D in 1D so basically removing y xis
+	
+	
+	Maintaing a per pixel y buffer set all y buffer values to -INF and now iterate through the coordinates
+	
+	calculate y per x coord using basic straight line geometry, if y-buffer for that point is less than y coord set y-buffer = y-coordinate
+	now draw that pixel if y-buffer is less than y 
+	
+	
+	For drawing 3D on 2D screen we use the z-buffer 
+	we need to store a 2d buffer
+	*zbuffer new int[width*height];
+	
+	index of z-buffer = x + y*width
+	x = idx %width;
+	y = idx / width;
+	
+	
+	now in order to calculate the z-value we calculate the barrycentric coords wrt to the triangle and then we multiply those with the z coordinates and add them together for the z-value.
+	
+	
+	Many new changes to the test.cpp file and geometry.h has been completely revamped
+	Change most the functions to work with Vec3f since up until to this we working working with Vec2i at someplaces.
+	
+	
+	In order to add textures, load the uvs for a triangle and then calculate uv tex values using
+	uv.x += uvs[i].x * bc_system[i]; for each vertex and y coord also
+	remember to flip the fucking texture //wasted 2 hours
